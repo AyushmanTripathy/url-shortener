@@ -9,7 +9,10 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var redirectCache Cache
+
 func main() {
+	redirectCache.init(1000000)
 	InitializeDBConnection()
 	defer Db.Close()
 

@@ -13,6 +13,12 @@ func redirect(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	log.Println("Redirect", vars["alias"])
 
+	cached, found := redirectCache.get(vars["alias"])
+	if found {
+		http.Redirect(w, r, cached, 302)
+		return
+	}
+
 	rows, err := Db.Query(GetRedirectURLQuery, vars["alias"])
 	if err != nil {
 		w.WriteHeader(500)
@@ -26,6 +32,7 @@ func redirect(w http.ResponseWriter, r *http.Request) {
 		rows.Scan(&redirectURL)
 	}
 
+	redirectCache.set(vars["alias"], redirectURL)
 	if len(redirectURL) < 2 {
 		w.WriteHeader(404)
 		fmt.Fprintln(w, "No redirect registered for alias", vars["alias"])

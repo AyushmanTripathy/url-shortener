@@ -10,8 +10,8 @@ services:
       POSTGRES_PASSWORD: a
       POSTGRES_DB: shortner
     volumes:
+      - ../init-scripts:/docker-entrypoint-initdb.d:ro
       - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ayush -d shortner"]
       interval: 5s

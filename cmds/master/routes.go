@@ -8,31 +8,59 @@ import (
 	. "github.com/ayushmantripathy/url-shortner/internal"
 )
 
-type createRedirectBody struct {
+type redirectBody struct {
 	Alias string `json:"alias"`
 	RedirectsTo string `json:"redirectsTo"`
 }
 
-func createNewRedirect(w http.ResponseWriter, r *http.Request) {
-	var body createRedirectBody
-	json.NewDecoder(r.Body).Decode(&body)
-	
+func (body *redirectBody) validate() (string, bool) {
 	if len(body.Alias) < 3 {
-		ReturnHTTPMessage(w, http.StatusBadRequest, "alias length cannot be less that 3")
-		return
+		return "alias length cannot be less that 3", true
 	}
 
 	contents, err := url.Parse(body.RedirectsTo)
 	if err != nil || contents.Scheme == "" || contents.Host == "" {
-		ReturnHTTPMessage(w, http.StatusBadRequest, "redirectsTo should be a valid URL")
-		return
+		return "redirectsTo should be a valid URL", true
 	}
 
-	_, err1 := Db.Exec(InsertRedirectQuery, body.Alias, body.RedirectsTo)
-	if err1 != nil {
-		ReturnHTTPMessage(w, http.StatusBadRequest, err1.Error())
+	return "", false
+}
+
+func createNewRedirect(w http.ResponseWriter, r *http.Request) {
+	var body redirectBody 
+	json.NewDecoder(r.Body).Decode(&body)
+	
+	if msg, invalid := body.validate(); invalid {
+		ReturnHTTPMessage(w, http.StatusBadRequest, msg)
+		return
+	}
+	
+	if _, err := Db.Exec(InsertRedirectQuery, body.Alias, body.RedirectsTo); err != nil {
+		ReturnHTTPMessage(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 
 	ReturnJSONResponse(w, http.StatusCreated).Encode(body)
+}
+
+func updateExistingRedirect(w http.ResponseWriter, r *http.Request) {
+	var body redirectBody 
+	json.NewDecoder(r.Body).Decode(&body)
+	
+	if msg, invalid := body.validate(); invalid {
+		ReturnHTTPMessage(w, http.StatusBadRequest, msg)
+		return
+	}
+
+	if _, err := Db.Exec(UpdateRedirectURLQuery, body.Alias, body.RedirectsTo); err != nil {
+		ReturnHTTPMessage(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+
+	// Return Accepted 202 if alias updation failed
+	if natsConn.Emit("alias.updates", body.Alias) != nil {
+		ReturnJSONResponse(w, http.StatusAccepted).Encode(body)
+	} else {
+		ReturnJSONResponse(w, http.StatusCreated).Encode(body)
+	}
 }

@@ -36,6 +36,8 @@
 
 ## Revision 1 (WebSockets & In-process caching)
 
+- In-Process cache following Cache aside
+
 ![Overview](./assets/overview_revision_1.png)
 
 ### Redirection Flow

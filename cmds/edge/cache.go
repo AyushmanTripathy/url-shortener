@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
@@ -25,9 +26,11 @@ func (c *Cache) get(key string) (string, bool) {
 }
 
 func (c *Cache) set(key string, val string) {
+	log.Println("Set", key, val)
 	c.cache.Add(key, val)
 }
 
 func (c *Cache) invalidate(key string) {
+	log.Println("Invalidated", key)
 	c.cache.Remove(key)
 }

@@ -377,7 +377,7 @@ Single Go executable with SQLite.
 
 - [X] Batch logs in edge
 - [X] Header to replace duplicated payload from logs
-- [ ] Replace JSON serialization for logs
+- [X] Replace JSON serialization for logs
 - [ ] Reduce Edge database calls with requests to Master
 - [ ] Workaround for NATS 1mb message size restriction
 - [ ] Persist batched logs on disk and retry to handle NATS network partition

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package logs;
+
+option go_package = "/pb";
+
+message RedirectLog {
+    string ip = 1;
+    string alias = 2;
+    string user_agent = 3;
+}
+
+message RedirectLogHeader {
+    string edge = 1;
+    uint32 count = 2;
+}

@@ -48,7 +48,12 @@ func createNewRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirectCache.Set(body.Alias, body.RedirectsTo)
-	ReturnJSONResponse(w, http.StatusCreated).Encode(body)
+	// Return Accepted 202 if alias updation failed
+	if natsConn.Emit("alias.updates", []byte(body.Alias)) != nil {
+		ReturnJSONResponse(w, http.StatusAccepted).Encode(body)
+	} else {
+		ReturnJSONResponse(w, http.StatusCreated).Encode(body)
+	}
 }
 
 func updateExistingRedirect(w http.ResponseWriter, r *http.Request) {

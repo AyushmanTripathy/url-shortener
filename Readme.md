@@ -81,7 +81,7 @@ flowchart TD
 4. Master VM checks its own cache and, only if that also misses, queries PostgreSQL and populates its cache.
 5. Master VM returns the destination URL in the response body.
 6. Edge VM populates its cache and responds with `302 Found`.
-7. If Master is unreachable, or returns `5xx` or any status other than `200`/`404`, Edge VM responds `503` and does not cache the result; if Master returns `404` Edge VM caches a negative entry and responds `404`.
+7. If Master is unreachable, or returns `5xx` or any status other than `200`/`404`, Edge VM responds `503` and does not cache the result; if Master returns `404` Edge VM caches a negative entry (empty value) and responds `404`. Later requests for that alias are answered `404` from the Edge cache without calling Master, until the entry expires (24h) or a `POST` invalidation event clears it.
 8. Log buffering and batched flush to NATS are unchanged from Revision 3.
 
 ```mermaid
@@ -97,29 +97,38 @@ sequenceDiagram
 
     User->>+Edge: GET /:alias
     Edge->>ECache: Check alias entry
-    alt Edge cache hit
+    alt Edge cache hit (URL)
         ECache-->>Edge: Return destination URL
+        Edge-->>User: 302 Found (Location: destination URL)
+    else Edge cache hit (negative entry)
+        ECache-->>Edge: Return empty value
+        Edge-->>User: 404 Not Found
     else Edge cache miss
         Edge->>+Master: HTTP GET /:alias
         Master->>MCache: Check alias entry
-        alt Master cache hit
-            MCache-->>Master: Return destination URL
-        else Master cache miss
+        alt Master cache miss
             Master->>+DB: SELECT destination FROM redirects WHERE code = alias
-            DB-->>-Master: Return destination URL
-            Master->>MCache: Populate cache (alias -> URL)
+            alt DB error
+                DB-->>Master: Error
+                Master-->>Edge: 503 (not cached)
+            else Row found or not found
+                DB-->>-Master: Destination URL or no row
+                Master->>MCache: Populate cache (alias -> URL, or empty for no row)
+            end
         end
         alt Master unreachable, 5xx or unexpected status
             Edge-->>User: 503 Service Unavailable (not cached)
-        else Alias not found (404)
+        else Alias not found
             Master-->>Edge: 404
+            Edge->>ECache: Populate negative entry (alias -> empty)
             Edge-->>User: 404 Not Found
         else Alias found
             Master-->>-Edge: 200 (destination URL as body)
             Edge->>ECache: Populate cache (alias -> URL)
+            Edge-->>User: 302 Found (Location: destination URL)
         end
     end
-    Edge-->>-User: 302 Found (Location: destination URL)
+    deactivate Edge
 
     Note over Edge,NATS: Asynchronous log batching (unchanged)
     Edge->>Edge: Buffer log entry in memory

@@ -1,6 +1,6 @@
 # URL Shortener
 
-__PS:__ docs are generated, code is hand-written :)
+__PS:__ Docs are generated, code is hand-written :)
 
 ## Requirements
 

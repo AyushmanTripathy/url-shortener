@@ -19,6 +19,7 @@ func fetchRedirect(alias string) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
+	defer rows.Close()
 
 	var redirectURL string
 	if rows.Next() {

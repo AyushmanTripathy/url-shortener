@@ -39,25 +39,12 @@ flowchart TD
         Internet(["Internet User"])
     end
 
-    subgraph EdgeRegions["Edge Regions (N Replicas: edge-1 ... edge-N)"]
-        direction TB
-        subgraph Edge1["Edge Instance 1"]
-            Redirector1["Redirector Service"]
-            Cache1[("In-Process Cache")]
-            Batcher1["Batching Service"]
-            Redirector1 <--> Cache1
-            Redirector1 -.->|"Buffer log"| Batcher1
-        end
-
-        Dots["... Horizontal Scaling (N Instances) ..."]
-
-        subgraph EdgeN["Edge Instance N"]
-            RedirectorN["Redirector Service"]
-            CacheN[("In-Process Cache")]
-            BatcherN["Batching Service"]
-            RedirectorN <--> CacheN
-            RedirectorN -.->|"Buffer log"| BatcherN
-        end
+    subgraph EdgeRegions["Edge Regions"]
+        Redirector["Redirector Service"]
+        Cache[("In-Process Cache")]
+        Batcher["Batching Service"]
+        Redirector <--> Cache
+        Redirector -.->|"Buffer log"| Batcher
     end
 
     subgraph MasterRegion["Master Region"]
@@ -75,35 +62,29 @@ flowchart TD
     end
 
     Admin -->|"POST / PATCH alias"| Master
-    Internet -->|"GET /:alias (Load Balanced)"| Redirector1
-    Internet -->|"GET /:alias (Load Balanced)"| RedirectorN
+    Internet -->|"GET /:alias"| Redirector
 
-    Redirector1 -.->|"Query on cache miss"| DB
-    RedirectorN -.->|"Query on cache miss"| DB
-
-    Batcher1 -->|"Batched flush (2s ticker)"| StreamLogs
-    BatcherN -->|"Batched flush (2s ticker)"| StreamLogs
-
-    StreamAlias -->|"Durable consumer (edge-1)"| Redirector1
-    StreamAlias -->|"Durable consumer (edge-N)"| RedirectorN
+    Redirector -.->|"Query on cache miss"| DB
+    Batcher -->|"Batched flush (2s ticker)"| StreamLogs
+    StreamAlias -->|"Durable consumer"| Redirector
 ```
 
 #### Redirection Flow
 
-1. Users on Internet send `GET /:alias`, load-balanced to any of the N Edge VM replicas (`edge-1` ... `edge-N`).
-2. The receiving Edge VM checks its local in-process cache (sync.Map, 100k capacity).
+1. Users on Internet send `GET /:alias`, received by Edge VM.
+2. Edge VM checks its local in-process cache (sync.Map, 100k capacity).
 3. If not found, Edge VM retrieves the alias entry from Master DB and populates its local cache.
 4. Edge VM immediately responds with `302 Found` (with destination URL) to the user.
 5. In the background, the request log is buffered in memory.
-6. A background ticker (every 2s) prepends a JSON header (`count`, instance `edge` hostname) and flushes the batched logs to NATS JetStream `logs.redirects`.
-7. Master VM consumer receives log batches from all N edge instances and performs a single bulk multi-row `INSERT INTO logs`.
+6. A background ticker (every 2s) prepends a JSON header (`count`, `edge` hostname) and flushes the batched logs to NATS JetStream `logs.redirects`.
+7. Master VM consumer receives log batches and performs a single bulk multi-row `INSERT INTO logs`.
 8. Master VM acknowledges the message batch to JetStream.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as Internet User
-    participant Edge as Edge VM (Instance i of N)
+    participant Edge as Edge VM
     participant Cache as In-Process Cache
     participant DB as Master DB (PostgreSQL)
     participant NATS as NATS JetStream (LOGS)
@@ -138,8 +119,8 @@ sequenceDiagram
 3. Master VM upserts alias entry into Master PostgreSQL DB.
 4. Master VM publishes cache invalidation event to NATS JetStream stream `ALIAS_UPDATIONS` on subject `alias.updates`.
 5. Master VM responds to Admin User (`200 OK` / `201 Created`, or `202 Accepted` if event publishing failed).
-6. NATS JetStream fans out the invalidation event to all N Edge VM durable consumers (`edge-1` ... `edge-N`), registered dynamically by hostname.
-7. Each Edge VM removes the alias from its in-process cache and acknowledges the message to JetStream.
+6. NATS JetStream delivers invalidation event to Edge VM's durable consumer.
+7. Edge VM removes the alias from its in-process cache and acknowledges the message to JetStream.
 
 ```mermaid
 sequenceDiagram
@@ -148,8 +129,7 @@ sequenceDiagram
     participant Master as Master VM
     participant DB as Master DB (PostgreSQL)
     participant NATS as NATS JetStream (ALIAS_UPDATIONS)
-    participant Edge1 as Edge VM 1
-    participant EdgeN as Edge VM N (1..N Replicas)
+    participant Edge as Edge VM
 
     Admin->>+Master: POST / or PATCH / (alias, redirectsTo)
     Master->>Master: Validate payload (length >= 3, valid URL)
@@ -165,18 +145,10 @@ sequenceDiagram
             Master-->>Admin: 202 Accepted (DB updated, invalidation queued)
         end
 
-        Note over NATS,EdgeN: Stream broadcasts to all N durable consumers (edge-1 ... edge-N) concurrently
-        par Fanout to Edge VM 1
-            NATS-)Edge1: Deliver message (alias) to consumer 'edge-1'
-            Edge1->>Edge1: Invalidate alias from local cache
-            Edge1-)NATS: Ack message
-        and Fanout to Edge VM N
-            NATS-)EdgeN: Deliver message (alias) to consumer 'edge-N'
-            EdgeN->>EdgeN: Invalidate alias from local cache
-            EdgeN-)NATS: Ack message
-        end
+        NATS-)Edge: Deliver message (alias) to durable consumer
+        Edge->>Edge: Invalidate alias from local cache
+        Edge-)NATS: Ack message
     end
-```
 ```
 
 ### Revision 2 (Message Queue instead of WebSockets)

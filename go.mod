@@ -1,4 +1,4 @@
-module ayushmantripathy/hello
+module github.com/ayushmantripathy/url-shortner
 
 go 1.27.2
 

@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	_ "github.com/glebarez/go-sqlite"
 )
 
-var db *sql.DB
+var Db *sql.DB
 
 const createTableQuery = 
 	`CREATE TABLE IF NOT EXISTS redirects (
@@ -16,10 +16,10 @@ const createTableQuery =
 		url TEXT NOT NULL
 	);`
 
-const insertRedirectQuery =
+const InsertRedirectQuery =
 	`INSERT INTO redirects (code, url) VALUES (?, ?);`
 
-const getRedirectURLQuery = 
+const GetRedirectURLQuery = 
 	`SELECT url FROM redirects WHERE code = ?;`
 
 func InitializeDBConnection() {
@@ -29,16 +29,16 @@ func InitializeDBConnection() {
 	}
 
 	var err error
-	if db, err = sql.Open("sqlite", dbUrl); err != nil {
+	if Db, err = sql.Open("sqlite", dbUrl); err != nil {
 		log.Fatal("Failed to connect to DB", err)
 	}
 
-	if err := db.Ping(); err != nil {
+	if err := Db.Ping(); err != nil {
 		log.Fatal("Failed to ping DB", err)
 	}
 	log.Print("DB Ping successfull")
 
-	if _, err = db.Exec(createTableQuery); err != nil {
+	if _, err = Db.Exec(createTableQuery); err != nil {
 		log.Fatal("Table creation failed", err)
 	}
 }

@@ -1,10 +1,13 @@
 # URL Shortner
 
-Future scopes
-- [X] Batch logs in edge
-- [ ] Persist batched logs on disk and retry to handle NATs downtime
+## Requirements
 
-## Revision 3 (Messaging System instead of Queue)
+- 1 billion redirects per day (11k per sec)
+- Redirect latency < 300ms (or as fast as i can make it)
+
+## Revisions
+
+### Revision 3 (Messaging System instead of Queue)
 
 - Messaging system instead of message queue
 - NATS Jetstream, to add persistance on top of NATS.
@@ -17,7 +20,7 @@ Future scopes
     - Long retension is not required
     - Instead edge nodes will perform batching
 
-## Revision 2 (Message Queue instead of WebSockets)
+### Revision 2 (Message Queue instead of WebSockets)
 
 - 2 queues for redirect logs & alias updation in Master region
 - For redirect logs,
@@ -28,7 +31,7 @@ Future scopes
 
 ![Overview](./assets/overview_revision_2.png)
 
-### Redirection Flow
+#### Redirection Flow
 
 1. Users on Internet `GET bit.ly/<alias>`, received by Edge VM.
 2. Edge VM checks its cache for the alias entry
@@ -40,7 +43,7 @@ Future scopes
 
 ![Redirection Flow](./assets/flow_1_revision_2.png)
 
-### Alias Entry Updation Flow
+#### Alias Entry Updation Flow
 
 1. Admin User perform REST (POST/PATCH) to Master VM
 2. Master VM validates request body and upserts to Master DB
@@ -51,13 +54,13 @@ Future scopes
 
 ![Updation Flow](./assets/flow_2_revision_2.png)
 
-## Revision 1 (WebSockets & In-process caching)
+### Revision 1 (WebSockets & In-process caching)
 
 - In-Process cache following Cache aside
 
 ![Overview](./assets/overview_revision_1.png)
 
-### Redirection Flow
+#### Redirection Flow
 
 1. Users on Internet `GET bit.ly/<alias>`, received by Edge VM.
 2. Edge VM checks its cache for the alias entry
@@ -68,7 +71,7 @@ Future scopes
 
 ![Redirection Flow](./assets/flow_1_revision_1.png)
 
-### Alias Entry Updation Flow
+#### Alias Entry Updation Flow
 
 1. Admin User perform REST (POST/PATCH) to Master VM
 2. Master VM validates request body and upserts to Master DB
@@ -77,6 +80,13 @@ Future scopes
 
 ![Updation Flow](./assets/flow_2_revision_1.png)
 
-## Revision 0
+### Revision 0
 
 Single go executable with sqlite.
+
+## Optimizations
+
+- [X] Batch logs in edge
+- [X] Header to replace duplicated payload from logs
+- [ ] Persist batched logs on disk and retry to handle NATs downtime
+

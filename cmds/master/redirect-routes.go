@@ -23,7 +23,12 @@ func fetchRedirect(alias string) (string, bool, error) {
 
 	var redirectURL string
 	if rows.Next() {
-		rows.Scan(&redirectURL)
+		if err = rows.Err(); err != nil {
+			return "", false, err
+		}
+		if err = rows.Scan(&redirectURL); err != nil {
+			return "", false, err
+		}
 	}
 
 	redirectCache.Set(alias, redirectURL)

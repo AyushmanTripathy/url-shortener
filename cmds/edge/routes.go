@@ -23,13 +23,17 @@ func fetchRedirect(alias string) (string, bool, error) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 503 {
-		return "", false, errors.New("503 from master for " + alias)
+	if resp.StatusCode >= 500 {
+		return "", false, errors.New("Server side error status from master for " + alias)
 	}
 
 	if resp.StatusCode == 404 {
 		redirectCache.Set(alias, "")
 		return "", false, nil
+	}
+
+	if resp.StatusCode != 200 {
+		return "", false, errors.New("Invalid status from master for " + alias)
 	}
 
 	body, err := io.ReadAll(resp.Body)

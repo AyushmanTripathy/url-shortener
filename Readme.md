@@ -381,4 +381,5 @@ Single Go executable with SQLite.
 - [ ] Reduce Edge database calls with requests to Master
 - [ ] Workaround for NATS 1mb message size restriction
 - [ ] Persist batched logs on disk and retry to handle NATS network partition
+- [ ] Seprate LSM Style DB for redirect logs
 - [ ] Prefiling Edge cache?

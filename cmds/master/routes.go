@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"unicode"
 
 	. "github.com/ayushmantripathy/url-shortner/internal"
 )
@@ -16,6 +17,12 @@ type redirectBody struct {
 func (body *redirectBody) validate() (string, bool) {
 	if len(body.Alias) < 3 {
 		return "alias length cannot be less that 3", true
+	}
+
+	for _, r := range body.Alias {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return "alias can only be unicode letters or digits", true
+		}
 	}
 
 	contents, err := url.Parse(body.RedirectsTo)

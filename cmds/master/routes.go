@@ -9,7 +9,7 @@ import (
 )
 
 type redirectBody struct {
-	Alias string `json:"alias"`
+	Alias       string `json:"alias"`
 	RedirectsTo string `json:"redirectsTo"`
 }
 
@@ -27,14 +27,14 @@ func (body *redirectBody) validate() (string, bool) {
 }
 
 func createNewRedirect(w http.ResponseWriter, r *http.Request) {
-	var body redirectBody 
+	var body redirectBody
 	json.NewDecoder(r.Body).Decode(&body)
-	
+
 	if msg, invalid := body.validate(); invalid {
 		ReturnHTTPMessage(w, http.StatusBadRequest, msg)
 		return
 	}
-	
+
 	if _, err := Db.Exec(InsertRedirectQuery, body.Alias, body.RedirectsTo); err != nil {
 		ReturnHTTPMessage(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -44,9 +44,9 @@ func createNewRedirect(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateExistingRedirect(w http.ResponseWriter, r *http.Request) {
-	var body redirectBody 
+	var body redirectBody
 	json.NewDecoder(r.Body).Decode(&body)
-	
+
 	if msg, invalid := body.validate(); invalid {
 		ReturnHTTPMessage(w, http.StatusBadRequest, msg)
 		return

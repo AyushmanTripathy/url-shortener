@@ -10,14 +10,11 @@ import (
 
 var Db *sql.DB
 
-const InsertRedirectQuery =
-	`INSERT INTO redirects (code, url) VALUES ($1, $2);`
+const InsertRedirectQuery = `INSERT INTO redirects (code, url) VALUES ($1, $2);`
 
-const GetRedirectURLQuery = 
-	`SELECT url FROM redirects WHERE code = $1;`
+const GetRedirectURLQuery = `SELECT url FROM redirects WHERE code = $1;`
 
-const UpdateRedirectURLQuery =
-	`UPDATE redirects SET url = $2 WHERE code = $1;`
+const UpdateRedirectURLQuery = `UPDATE redirects SET url = $2 WHERE code = $1;`
 
 func InitializeDBConnection() {
 	dbUrl, found := os.LookupEnv("DB_URL")

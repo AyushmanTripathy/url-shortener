@@ -24,7 +24,7 @@ func redirect(w http.ResponseWriter, r *http.Request) {
 		log.Println("Redirect failed for alias =", vars["alias"])
 		log.Println(err)
 		return
-	} 
+	}
 
 	var redirectURL string
 	if rows.Next() {

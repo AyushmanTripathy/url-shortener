@@ -27,5 +27,5 @@ func main() {
 		log.Fatal("PORT not found")
 	}
 
-	http.ListenAndServe(":" + port, routes)
+	http.ListenAndServe(":"+port, routes)
 }

@@ -16,6 +16,10 @@ func main() {
 	defer Db.Close()
 
 	natsConn.Init()
+	natsConn.EnsureStream("LOGS", []string{"logs.redirects"})
+	natsConn.EnsureConsumer("master", "LOGS", "logs.redirects")
+	natsConn.Receive("master", "LOGS", handleRedirectLogs)
+	defer natsConn.CloseReceiver()
 
 	routes := mux.NewRouter()
 

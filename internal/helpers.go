@@ -5,6 +5,13 @@ import (
 	"net/http"
 )
 
+type RedirectLog struct {
+	Ip        string `json:"ip"`
+	Edge      string `json:"edge"`
+	UserAgent string `json:"userAgent"`
+	Code      string `json:"code"`
+}
+
 type httpError struct {
 	Message string `json:"message"`
 }

@@ -58,7 +58,7 @@ func updateExistingRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return Accepted 202 if alias updation failed
-	if natsConn.Emit("alias.updates", body.Alias) != nil {
+	if natsConn.Emit("alias.updates", []byte(body.Alias)) != nil {
 		ReturnJSONResponse(w, http.StatusAccepted).Encode(body)
 	} else {
 		ReturnJSONResponse(w, http.StatusOK).Encode(body)

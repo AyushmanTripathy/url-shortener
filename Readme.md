@@ -1,5 +1,22 @@
 # URL Shortner
 
+Future scopes
+- [X] Batch logs in edge
+- [ ] Persist batched logs on disk and retry to handle NATs downtime
+
+## Revision 3 (Messaging System instead of Queue)
+
+- Messaging system instead of message queue
+- NATS Jetstream, to add persistance on top of NATS.
+- for alias updates,
+    - MQs (RabbitMQ) requires awkard Exchange with Fanout
+    - NATS support multiple consumer delivery on single stream
+- for redirect logs,
+    - Kafka suits long persistance or multiple consumers on high load 
+    - Consumer is always single master
+    - Long retension is not required
+    - Instead edge nodes will perform batching
+
 ## Revision 2 (Message Queue instead of WebSockets)
 
 - 2 queues for redirect logs & alias updation in Master region

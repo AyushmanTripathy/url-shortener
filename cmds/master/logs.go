@@ -45,7 +45,7 @@ func handleRedirectLogs(msg jetstream.Msg) {
 		log.Println("Failed to read RedirectLogHeader bytes, ignoring")
 		return
 	} else if err = proto.Unmarshal(headerBytes, &logHeader); err != nil {
-		log.Println("Failed to parse RedirectLogHeader, ignoring", err, headerBytes)
+		log.Println("Failed to parse RedirectLogHeader, ignoring", err)
 		return
 	}
 

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"log"
 	"net/http"
+	"os"
 
-	"github.com/gorilla/mux"
 	. "github.com/ayushmantripathy/url-shortner/internal"
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -15,5 +17,10 @@ func main() {
 
 	routes.HandleFunc("/", createNewRedirect).Methods("POST")
 
-	http.ListenAndServe(":8080", routes)
+	port, found := os.LookupEnv("PORT")
+	if !found {
+		log.Fatal("PORT not found")
+	}
+
+	http.ListenAndServe(":" + port, routes)
 }

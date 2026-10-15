@@ -4,16 +4,16 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	. "github.com/ayushmantripathy/url-shortner/internal"
 )
 
 func main() {
 	InitializeDBConnection()
-	defer db.Close()
+	defer Db.Close()
 
 	routes := mux.NewRouter()
 
-	routes.HandleFunc("/{alias}", Redirect).Methods("GET")
-	routes.HandleFunc("/", CreateNewRedirect).Methods("POST")
+	routes.HandleFunc("/{alias}", redirect).Methods("GET")
 
 	http.ListenAndServe(":8080", routes)
 }

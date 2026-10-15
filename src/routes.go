@@ -17,12 +17,12 @@ type createRedirectBody struct {
 
 func Redirect(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	log.Println("Redirect", vars["code"])
+	log.Println("Redirect", vars["alias"])
 
-	rows, err := db.Query(getRedirectURLQuery, vars["code"])
+	rows, err := db.Query(getRedirectURLQuery, vars["alias"])
 	if err != nil {
 		w.WriteHeader(500)
-		log.Println("Redirect failed for code =", vars["code"])
+		log.Println("Redirect failed for alias =", vars["alias"])
 		log.Println(err)
 		return
 	} 
@@ -34,7 +34,7 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 
 	if len(redirectURL) < 2 {
 		w.WriteHeader(404)
-		fmt.Fprintln(w, "No redirect registered for code", vars["code"])
+		fmt.Fprintln(w, "No redirect registered for alias", vars["alias"])
 		return
 	}
 

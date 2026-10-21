@@ -11,7 +11,6 @@ import (
 
 func redirect(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	log.Println("Redirect", vars["alias"])
 
 	cached, found := redirectCache.get(vars["alias"])
 	if found {

@@ -16,6 +16,9 @@ const InsertRedirectQuery =
 const GetRedirectURLQuery = 
 	`SELECT url FROM redirects WHERE code = $1;`
 
+const UpdateRedirectURLQuery =
+	`UPDATE redirects SET url = $2 WHERE code = $1;`
+
 func InitializeDBConnection() {
 	dbUrl, found := os.LookupEnv("DB_URL")
 	if !found {

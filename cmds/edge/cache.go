@@ -13,7 +13,7 @@ type Cache struct {
 }
 
 func (c *Cache) init(entries int) {
-	c.cache = expirable.NewLRU[string, string](entries, nil, time.Minute * 10)
+	c.cache = expirable.NewLRU[string, string](entries, nil, time.Minute*10)
 }
 
 func (c *Cache) get(key string) (string, bool) {

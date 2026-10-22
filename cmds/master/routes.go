@@ -35,7 +35,7 @@ func createNewRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := Db.Exec(InsertRedirectQuery, body.Alias, body.RedirectsTo); err != nil {
+	if err := InsertRedirectEntry(body.Alias, body.RedirectsTo); err != nil {
 		ReturnHTTPMessage(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -52,7 +52,7 @@ func updateExistingRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := Db.Exec(UpdateRedirectURLQuery, body.Alias, body.RedirectsTo); err != nil {
+	if err := UpdateRedirectEntry(body.Alias, body.RedirectsTo); err != nil {
 		ReturnHTTPMessage(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -61,6 +61,6 @@ func updateExistingRedirect(w http.ResponseWriter, r *http.Request) {
 	if natsConn.Emit("alias.updates", body.Alias) != nil {
 		ReturnJSONResponse(w, http.StatusAccepted).Encode(body)
 	} else {
-		ReturnJSONResponse(w, http.StatusCreated).Encode(body)
+		ReturnJSONResponse(w, http.StatusOK).Encode(body)
 	}
 }

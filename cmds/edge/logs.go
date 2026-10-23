@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -42,19 +43,34 @@ func (ser *BatchingService) flush(ticker *time.Ticker) {
 
 		ser.mu.Lock()
 		clone := make([]byte, ser.logs.Len())
+		logCount := ser.flushPending
 		copy(clone, ser.logs.Bytes())
 		ser.logs.Reset()
 		ser.flushPending = 0
 		ser.mu.Unlock()
 
-		natsConn.Emit("logs.redirects", clone)
+		header, err := json.Marshal(RedirectLogHeader{
+			Count: logCount,
+			Edge:  instanceName,
+		})
+		if err != nil {
+			log.Println("Failed to create header for logs, giving up", err)
+			return
+		}
+
+		combined := make([]byte, 1+len(header)+len(clone))
+
+		copy(combined, header)
+		combined[len(header)] = '\n'
+		copy(combined[len(header)+1:], clone)
+
+		natsConn.Emit("logs.redirects", combined)
 	}
 }
 
 func (ser *BatchingService) pushRedirectLog(r *http.Request, alias string) {
 	bytes, _ := json.Marshal(RedirectLog{
 		Ip:        readUserIP(r),
-		Edge:      instanceName,
 		UserAgent: r.UserAgent(),
 		Code:      alias,
 	})

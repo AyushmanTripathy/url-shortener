@@ -15,14 +15,25 @@ import (
 func handleRedirectLogs(msg jetstream.Msg) {
 	defer msg.Ack()
 
-	logs := msg.Data()
-
 	var logEntry RedirectLog
-	reader := bytes.NewReader(logs)
+	var logHeader RedirectLogHeader
+
+	reader := bytes.NewReader(msg.Data())
 	scanner := bufio.NewReader(reader)
 
 	var sb strings.Builder
 	sb.WriteString("INSERT INTO logs (code, ip, edge, user_agent) VALUES ")
+
+	headerLine, err := scanner.ReadBytes('\n')
+	if err != nil {
+		log.Println("No header found with logs, ignoring")
+		return
+	}
+
+	if err = json.Unmarshal(headerLine, &logHeader); err != nil {
+		log.Println("Failed to parse header log json, ignoring", err)
+		return
+	}
 
 	args := make([]any, 0)
 
@@ -42,7 +53,7 @@ func handleRedirectLogs(msg jetstream.Msg) {
 		}
 		fmt.Fprintf(&sb, "($%d,$%d,$%d,$%d)", i*4+1, i*4+2, i*4+3, i*4+4)
 
-		args = append(args, logEntry.Code, logEntry.Ip, logEntry.Edge, logEntry.UserAgent)
+		args = append(args, logEntry.Code, logEntry.Ip, logHeader.Edge, logEntry.UserAgent)
 	}
 
 	if len(args) <= 0 {
@@ -50,6 +61,6 @@ func handleRedirectLogs(msg jetstream.Msg) {
 	}
 
 	if _, err := Db.Exec(sb.String(), args...); err != nil {
-		log.Println("Failed to push logs to Db. source = ", logEntry.Edge)
+		log.Println("Failed to push logs to Db. source = ", logHeader.Edge)
 	}
 }

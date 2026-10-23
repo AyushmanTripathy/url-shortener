@@ -1,9 +1,12 @@
 # URL Shortener
 
+__PS:__ docs are generated, code is hand-written :)
+
 ## Requirements
 
 - 1 billion redirects per day (~11.6k per sec)
-- Redirect latency < 300ms (or as fast as I can make it)
+- Redirect P99 latency < 100ms (or as fast as I can make it)
+- No CDN Caching, Only Anycast DNS + Edge VMs
 - No permanent redirects as we need analytics
 
 ```sh
@@ -370,8 +373,12 @@ sequenceDiagram
 
 Single Go executable with SQLite.
 
-## Optimizations
+### Planned Optimizations
 
 - [X] Batch logs in edge
 - [X] Header to replace duplicated payload from logs
-- [ ] Persist batched logs on disk and retry to handle NATS downtime
+- [ ] Replace JSON serialization for logs
+- [ ] Reduce Edge database calls with requests to Master
+- [ ] Workaround for NATS 1mb message size restriction
+- [ ] Persist batched logs on disk and retry to handle NATS network partition
+- [ ] Prefiling Edge cache?

@@ -90,11 +90,11 @@ func (conn *NATSConnection) Receive(consumerName string, streamName string, hand
 	conn.cc, _ = consumer.Consume(handler)
 }
 
-func (conn *NATSConnection) Emit(subjectName string, payload string) error {
+func (conn *NATSConnection) Emit(subjectName string, payload []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	_, err := conn.js.Publish(ctx, subjectName, []byte(payload))
+	_, err := conn.js.Publish(ctx, subjectName, payload)
 	return err
 }
 

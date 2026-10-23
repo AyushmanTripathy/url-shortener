@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -18,7 +17,6 @@ func (c *Cache) init(entries int) {
 
 func (c *Cache) get(key string) (string, bool) {
 	cachedUrl, ok := c.cache.Get(key)
-	fmt.Println(cachedUrl, ok, "cache")
 	if len(cachedUrl) < 2 {
 		return cachedUrl, false
 	}

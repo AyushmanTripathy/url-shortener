@@ -21,8 +21,6 @@ const updateRedirectURLQuery = `UPDATE redirects SET url = $2 WHERE code = $1;`
 
 const insertHistoryQuery = `INSERT INTO history (code, url) VALUES ($1, $2)`
 
-const InsertLogQuery = `INSERT INTO logs (code, edge, user_agent) VALUES ($1, $2, $3)`
-
 func InsertRedirectEntry(code string, url string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

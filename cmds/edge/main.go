@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	. "github.com/ayushmantripathy/url-shortner/internal"
 	"github.com/gorilla/mux"
@@ -12,6 +13,7 @@ import (
 
 var redirectCache Cache
 var natsConn NATSConnection
+var redirectLogs BatchingService
 var instanceName string
 
 func main() {
@@ -22,7 +24,8 @@ func main() {
 		log.Println("Name: ", instanceName)
 	}
 
-	redirectCache.init(1000000)
+	redirectCache.init(100000)
+
 	InitializeDBConnection()
 	defer Db.Close()
 
@@ -34,6 +37,8 @@ func main() {
 		msg.Ack()
 	})
 	defer natsConn.CloseReceiver()
+
+	redirectLogs.init(time.Second*2)
 
 	routes := mux.NewRouter()
 

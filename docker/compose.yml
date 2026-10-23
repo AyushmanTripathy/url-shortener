@@ -41,7 +41,7 @@ services:
       NATS_URL: nats://nats:4222
       PORT: 80
     ports:
-      - "8001-8010:80"
+      - "8001-8002:80"
     deploy:
       replicas: 2
     depends_on:

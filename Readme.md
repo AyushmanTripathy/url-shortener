@@ -1,6 +1,6 @@
 # URL Shortener
 
-__PS:__ docs are generated, code is hand-written :)
+__PS:__ Docs are generated, code is hand-written :)
 
 ## Requirements
 
@@ -378,6 +378,7 @@ Single Go executable with SQLite.
 - [X] Batch logs in edge
 - [X] Header to replace duplicated payload from logs
 - [ ] Replace JSON serialization for logs
+- [ ] Try protocol buffers
 - [ ] Reduce Edge database calls with requests to Master
 - [ ] Workaround for NATS 1mb message size restriction
 - [ ] Persist batched logs on disk and retry to handle NATS network partition

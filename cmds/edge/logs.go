@@ -63,7 +63,7 @@ func (ser *BatchingService) flush(ticker *time.Ticker) {
 		})
 		if err != nil {
 			log.Println("Failed to marshall RedirectLogHeader, giving up", err)
-			return
+			continue
 		}
 
 		lenBuf := encodeProtoBufLength(&header)

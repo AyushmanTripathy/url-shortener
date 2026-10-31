@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/binary"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
-	. "github.com/ayushmantripathy/url-shortner/internal"
+	"github.com/ayushmantripathy/url-shortner/pb"
+	"google.golang.org/protobuf/proto"
 )
 
 func readUserIP(r *http.Request) string {
@@ -22,10 +23,16 @@ func readUserIP(r *http.Request) string {
 	return iPAddress
 }
 
+func encodeProtoBufLength(bytes *[]byte) []byte {
+	lengthBuf := make([]byte, 2)
+	binary.BigEndian.PutUint16(lengthBuf, uint16(len(*bytes)))
+	return lengthBuf
+}
+
 type BatchingService struct {
 	mu           sync.Mutex
 	logs         bytes.Buffer
-	flushPending int32
+	flushPending uint32
 }
 
 func (ser *BatchingService) init(interval time.Duration) {
@@ -49,36 +56,42 @@ func (ser *BatchingService) flush(ticker *time.Ticker) {
 		ser.flushPending = 0
 		ser.mu.Unlock()
 
-		header, err := json.Marshal(RedirectLogHeader{
+		header, err := proto.Marshal(&pb.RedirectLogHeader{
 			Count: logCount,
 			Edge:  instanceName,
 		})
 		if err != nil {
-			log.Println("Failed to create header for logs, giving up", err)
+			log.Println("Failed to marshall RedirectLogHeader, giving up", err)
 			return
 		}
 
-		combined := make([]byte, 1+len(header)+len(clone))
+		lenBuf := encodeProtoBufLength(&header)
+		combined := make([]byte, len(lenBuf)+len(header)+len(clone))
 
-		copy(combined, header)
-		combined[len(header)] = '\n'
-		copy(combined[len(header)+1:], clone)
+		copy(combined, lenBuf)
+		copy(combined[len(lenBuf):], header)
+		copy(combined[len(header)+len(lenBuf):], clone)
 
 		natsConn.Emit("logs.redirects", combined)
 	}
 }
 
 func (ser *BatchingService) pushRedirectLog(r *http.Request, alias string) {
-	bytes, _ := json.Marshal(RedirectLog{
+	bytes, err := proto.Marshal(&pb.RedirectLog{
 		Ip:        readUserIP(r),
 		UserAgent: r.UserAgent(),
-		Code:      alias,
+		Alias:     alias,
 	})
+	lenBuf := encodeProtoBufLength(&bytes)
+	if err != nil {
+		log.Println("Failed to marshal RedirectLog, ignoring.")
+		return
+	}
 
 	ser.mu.Lock()
 	defer ser.mu.Unlock()
 
 	ser.flushPending++
+	ser.logs.Write(lenBuf)
 	ser.logs.Write(bytes)
-	ser.logs.WriteByte('\n')
 }

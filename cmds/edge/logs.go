@@ -44,11 +44,12 @@ func (ser *BatchingService) flush(ticker *time.Ticker) {
 	for {
 		<-ticker.C
 
+		ser.mu.Lock()
 		if ser.flushPending <= 0 {
+			ser.mu.Unlock()
 			continue
 		}
 
-		ser.mu.Lock()
 		clone := make([]byte, ser.logs.Len())
 		logCount := ser.flushPending
 		copy(clone, ser.logs.Bytes())

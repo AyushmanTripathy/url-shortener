@@ -51,8 +51,8 @@ func handleRedirectLogs(msg jetstream.Msg) {
 
 	args := make([]any, 0)
 
-	var i int
-	for i = 0; true; i++ {
+	i := 0
+	for {
 
 		if logBytes, ended := getProtoBufferBytes(&payload, &offset); ended {
 			break
@@ -68,6 +68,7 @@ func handleRedirectLogs(msg jetstream.Msg) {
 
 		args = append(args, logEntry.Alias, logEntry.Ip, logHeader.Edge, logEntry.UserAgent)
 		logEntry.Reset()
+		i++
 	}
 	if int(logHeader.Count) != i {
 		log.Println("Log count mismatch, expected", logHeader.Count, "got", i)

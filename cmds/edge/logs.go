@@ -23,9 +23,9 @@ func readUserIP(r *http.Request) string {
 	return iPAddress
 }
 
-func encodeProtoBufLength(bytes *[]byte) []byte {
-	lengthBuf := make([]byte, 2)
-	binary.BigEndian.PutUint16(lengthBuf, uint16(len(*bytes)))
+func encodeProtoBufLength(length int) [2]byte {
+	var lengthBuf [2]byte
+	binary.BigEndian.PutUint16(lengthBuf[:], uint16(length))
 	return lengthBuf
 }
 
@@ -66,10 +66,10 @@ func (ser *BatchingService) flush(ticker *time.Ticker) {
 			continue
 		}
 
-		lenBuf := encodeProtoBufLength(&header)
+		lenBuf := encodeProtoBufLength(len(header))
 		combined := make([]byte, len(lenBuf)+len(header)+len(clone))
 
-		copy(combined, lenBuf)
+		copy(combined, lenBuf[:])
 		copy(combined[len(lenBuf):], header)
 		copy(combined[len(header)+len(lenBuf):], clone)
 
@@ -83,7 +83,7 @@ func (ser *BatchingService) pushRedirectLog(r *http.Request, alias string) {
 		UserAgent: r.UserAgent(),
 		Alias:     alias,
 	})
-	lenBuf := encodeProtoBufLength(&bytes)
+	lenBuf := encodeProtoBufLength(len(bytes))
 	if err != nil {
 		log.Println("Failed to marshal RedirectLog, ignoring.")
 		return
@@ -93,6 +93,6 @@ func (ser *BatchingService) pushRedirectLog(r *http.Request, alias string) {
 	defer ser.mu.Unlock()
 
 	ser.flushPending++
-	ser.logs.Write(lenBuf)
+	ser.logs.Write(lenBuf[:])
 	ser.logs.Write(bytes)
 }

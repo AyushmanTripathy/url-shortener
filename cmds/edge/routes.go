@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"io"
 	"net/http"
-
-	. "github.com/ayushmantripathy/url-shortner/internal"
 	"github.com/gorilla/mux"
 )
 
@@ -13,31 +11,34 @@ func redirect(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	defer redirectLogs.pushRedirectLog(r, vars["alias"])
 
-	cached, found := redirectCache.get(vars["alias"])
+	cached, found := redirectCache.Get(vars["alias"])
 	if found {
 		http.Redirect(w, r, cached, 302)
 		return
 	}
 
-	rows, err := Db.Query(GetRedirectURLQuery, vars["alias"])
+	resp, err := http.Get(masterUrl + vars["alias"])
 	if err != nil {
-		w.WriteHeader(500)
-		log.Println("Redirect failed for alias =", vars["alias"])
-		log.Println(err)
+		w.WriteHeader(503)
+		fmt.Fprintln(w, "Unable to fetch alias", vars["alias"])
 		return
 	}
+	defer resp.Body.Close()
 
-	var redirectURL string
-	if rows.Next() {
-		rows.Scan(&redirectURL)
-	}
-
-	redirectCache.set(vars["alias"], redirectURL)
-	if len(redirectURL) < 2 {
+	if resp.StatusCode == 404 {
 		w.WriteHeader(404)
 		fmt.Fprintln(w, "No redirect registered for alias", vars["alias"])
 		return
 	}
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		w.WriteHeader(400)
+		fmt.Fprintln(w, "Failed to parse entry for alias", vars["alias"])
+		return
+	}
+
+	redirectURL := string(body)
+	redirectCache.Set(vars["alias"], redirectURL)
 	http.Redirect(w, r, redirectURL, 302)
 }

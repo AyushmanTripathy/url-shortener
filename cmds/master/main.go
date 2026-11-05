@@ -9,11 +9,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var redirectCache Cache
 var natsConn NATSConnection
 
 func main() {
 	InitializeDBConnection()
 	defer Db.Close()
+
+	redirectCache.Init(100000)
 
 	natsConn.Init()
 	natsConn.EnsureStream("LOGS", []string{"logs.redirects"})
@@ -25,6 +28,7 @@ func main() {
 
 	routes.HandleFunc("/", createNewRedirect).Methods("POST")
 	routes.HandleFunc("/", updateExistingRedirect).Methods("PATCH")
+	routes.HandleFunc("/{alias}", getRedirect).Methods("GET")
 
 	port, found := os.LookupEnv("PORT")
 	if !found {

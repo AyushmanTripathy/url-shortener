@@ -15,6 +15,7 @@ var redirectCache Cache
 var natsConn NATSConnection
 var redirectLogs BatchingService
 var instanceName string
+var masterUrl string
 
 func main() {
 	if hostname, err := os.Hostname(); err != nil {
@@ -24,16 +25,13 @@ func main() {
 		log.Println("Name: ", instanceName)
 	}
 
-	redirectCache.init(100000)
-
-	InitializeDBConnection()
-	defer Db.Close()
+	redirectCache.Init(100000)
 
 	natsConn.Init()
 	natsConn.EnsureStream("ALIAS_UPDATIONS", []string{"alias.updates"})
 	natsConn.EnsureConsumer(instanceName, "ALIAS_UPDATIONS", "alias.updates")
 	natsConn.Receive(instanceName, "ALIAS_UPDATIONS", func(msg jetstream.Msg) {
-		redirectCache.invalidate(string(msg.Data()))
+		redirectCache.Invalidate(string(msg.Data()))
 		msg.Ack()
 	})
 	defer natsConn.CloseReceiver()
@@ -47,6 +45,11 @@ func main() {
 	port, found := os.LookupEnv("PORT")
 	if !found {
 		log.Fatal("PORT not found")
+	}
+
+	masterUrl, found = os.LookupEnv("MASTER_URL")
+	if !found {
+		log.Fatal("MASTER_URL not found")
 	}
 
 	http.ListenAndServe(":"+port, routes)

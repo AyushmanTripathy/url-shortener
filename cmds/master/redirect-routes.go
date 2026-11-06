@@ -31,7 +31,6 @@ func fetchRedirect(alias string) (string, bool, error) {
 		return "", false, nil
 	}
 
-	redirectCache.Set(alias, redirectURL)
 	return redirectURL, true, nil
 }
 

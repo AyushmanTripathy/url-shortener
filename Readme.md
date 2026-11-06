@@ -22,6 +22,165 @@ PATCH /
 
 ## Revisions
 
+### Revision 4 (Edge nodes no longer talk to the DB)
+
+- Edge VMs no longer hold a PostgreSQL connection (`DB_URL` removed from edge config)
+- On cache miss, Edge VM calls Master VM over HTTP
+- Master VM exposes a new `GET /:alias` endpoint, which returns the destination URL as plain text
+- Master VM gets its own in-process cache
+    - Read-through on `GET /:alias`
+    - Write-through on `POST /` and `PATCH /`
+- Cache TTL raised from 10 minutes to 24 hours, as the invalidation events from NATS keep Edge caches fresh
+- Reduces DB connections from (edges + master) to just master, and shields the DB from cache-miss storms across edges
+- Logging (NATS `LOGS`) and invalidation (NATS `ALIAS_UPDATIONS`) flows are unchanged
+
+```mermaid
+flowchart TD
+    subgraph Clients["Clients"]
+        Admin(["Admin User"])
+        Internet(["Internet User"])
+    end
+
+    subgraph EdgeRegions["Edge Regions"]
+        Redirector["Redirector Service"]
+        EdgeCache[("In-Process Cache")]
+        Batcher["Batching Service"]
+        Redirector <--> EdgeCache
+        Redirector -.->|"Buffer log"| Batcher
+    end
+
+    subgraph MasterRegion["Master Region"]
+        Master["Master Instance (CRUD, Lookup & Ingester)"]
+        MasterCache[("In-Process Cache")]
+        DB[("Database (PostgreSQL)")]
+
+        subgraph JetStream["NATS JetStream Broker"]
+            StreamAlias[["Stream: ALIAS_UPDATIONS (alias.updates)"]]
+            StreamLogs[["Stream: LOGS (logs.redirects)"]]
+        end
+
+        Master <--> MasterCache
+        Master <--> DB
+        Master -->|"Publish alias update"| StreamAlias
+        StreamLogs -->|"Deliver log batches"| Master
+    end
+
+    Admin -->|"POST / PATCH alias"| Master
+    Internet -->|"GET /:alias"| Redirector
+
+    Redirector -.->|"HTTP GET /:alias on cache miss"| Master
+    Batcher -->|"Batched flush (2s ticker)"| StreamLogs
+    StreamAlias -->|"Durable consumer"| Redirector
+```
+
+#### Redirection Flow
+
+1. Users on Internet send `GET /:alias`, received by Edge VM.
+2. Edge VM checks its local in-process cache (LRU, 100k capacity, 24h TTL).
+3. On a cache miss, Edge VM sends `GET /:alias` to Master VM.
+4. Master VM checks its own cache and, only if that also misses, queries PostgreSQL and populates its cache.
+5. Master VM returns the destination URL in the response body.
+6. Edge VM populates its cache and responds with `302 Found`.
+7. If Master is unreachable, or returns `5xx` or any status other than `200`/`404`, Edge VM responds `503` and does not cache the result; if Master returns `404` Edge VM caches a negative entry and responds `404`.
+8. Log buffering and batched flush to NATS are unchanged from Revision 3.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Internet User
+    participant Edge as Edge VM
+    participant ECache as Edge Cache
+    participant Master as Master VM
+    participant MCache as Master Cache
+    participant DB as Master DB (PostgreSQL)
+    participant NATS as NATS JetStream (LOGS)
+
+    User->>+Edge: GET /:alias
+    Edge->>ECache: Check alias entry
+    alt Edge cache hit
+        ECache-->>Edge: Return destination URL
+    else Edge cache miss
+        Edge->>+Master: HTTP GET /:alias
+        Master->>MCache: Check alias entry
+        alt Master cache hit
+            MCache-->>Master: Return destination URL
+        else Master cache miss
+            Master->>+DB: SELECT destination FROM redirects WHERE code = alias
+            DB-->>-Master: Return destination URL
+            Master->>MCache: Populate cache (alias -> URL)
+        end
+        alt Master unreachable, 5xx or unexpected status
+            Edge-->>User: 503 Service Unavailable (not cached)
+        else Alias not found (404)
+            Master-->>Edge: 404
+            Edge-->>User: 404 Not Found
+        else Alias found
+            Master-->>-Edge: 200 (destination URL as body)
+            Edge->>ECache: Populate cache (alias -> URL)
+        end
+    end
+    Edge-->>-User: 302 Found (Location: destination URL)
+
+    Note over Edge,NATS: Asynchronous log batching (unchanged)
+    Edge->>Edge: Buffer log entry in memory
+    opt Every 2 seconds (Batch Timer)
+        Edge-)NATS: Flush batch to logs.redirects
+    end
+```
+
+#### Alias Entry Update Flow
+
+1. Admin User performs REST (`POST /` or `PATCH /`) to Master VM.
+2. Master VM validates request body (alias length >= 3, letters/digits only, valid destination URL).
+3. Master VM inserts (`POST`) or updates (`PATCH`) the alias entry in PostgreSQL; failure returns `422`.
+4. Master VM writes the new value into its own cache (write-through).
+5. Master VM publishes an invalidation event to `ALIAS_UPDATIONS` (`alias.updates`) for both `POST` and `PATCH`. For `POST` this clears any negatively-cached (`404`) entry on Edges.
+6. Master VM responds `201 Created` (`POST`) or `200 OK` (`PATCH`), or `202 Accepted` if the event publish failed.
+7. NATS JetStream delivers the event to every Edge VM's durable consumer, which removes the alias from its cache and acks. The next request refetches from Master, which already holds the fresh value.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Admin User
+    participant Master as Master VM
+    participant MCache as Master Cache
+    participant DB as Master DB (PostgreSQL)
+    participant NATS as NATS JetStream (ALIAS_UPDATIONS)
+    participant Edge as Edge VM
+    participant ECache as Edge Cache
+
+    Admin->>+Master: POST / or PATCH / (alias, redirectsTo)
+    Master->>Master: Validate payload
+    alt Invalid request
+        Master-->>Admin: 400 Bad Request
+    else Valid request
+        Master->>+DB: INSERT (POST) / UPDATE (PATCH) redirects
+        alt DB error
+            DB-->>Master: Error
+            Master-->>Admin: 422 Unprocessable Entity
+        else DB success
+            DB-->>-Master: Confirm write
+            Master->>MCache: Set alias -> URL (write-through)
+            Master-)NATS: Publish alias name to alias.updates
+            alt Publish success
+                Master-->>Admin: 201 Created (POST) / 200 OK (PATCH)
+            else Publish failure
+                Master-->>-Admin: 202 Accepted (DB updated, invalidation not sent)
+            end
+            NATS-)Edge: Deliver message (alias) to durable consumer
+            Edge->>ECache: Invalidate alias
+            Edge-)NATS: Ack message
+        end
+    end
+
+    Note over Edge,Master: Next GET on Edge misses cache and refetches the fresh value from Master cache
+```
+
+#### Negative caching
+
+- Master `GET /:alias` now returns `404` for an unknown alias (and `503` on a DB error); Edge maps `404` to `404`, and any error or unexpected (non-`200`/`404`) status to `503` without caching.
+- Unknown aliases are cached as an empty value on both Edge and Master (`Cache.Get` returns `found` and `valid` separately), so repeated lookups of a missing alias don't reach the DB.
+
 ### Revision 3 (Messaging System instead of Queue)
 
 - NATS Messaging system instead of message queue
@@ -378,7 +537,10 @@ Single Go executable with SQLite.
 - [X] Batch logs in edge
 - [X] Header to replace duplicated payload from logs
 - [X] Replace JSON serialization for logs
-- [ ] Reduce Edge database calls with requests to Master
+- [X] Reduce Edge database calls with requests to Master
+- [ ] NATs network partitioning
+- [ ] Cache miss leading to initial request brust
+- [ ] Handling 500s from master, without brusts
 - [ ] Workaround for NATS 1mb message size restriction
 - [ ] Persist batched logs on disk and retry to handle NATS network partition
 - [ ] Seprate LSM Style DB for redirect logs

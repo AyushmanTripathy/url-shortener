@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"net/url"
 	"unicode"
 
 	. "github.com/ayushmantripathy/url-shortner/internal"
@@ -25,12 +24,7 @@ func (body *redirectBody) validate() (string, bool) {
 		}
 	}
 
-	contents, err := url.Parse(body.RedirectsTo)
-	if err != nil || contents.Scheme == "" || contents.Host == "" {
-		return "redirectsTo should be a valid URL", true
-	}
-
-	return "", false
+	return validateDestinationURL(body.RedirectsTo)
 }
 
 func createNewRedirect(w http.ResponseWriter, r *http.Request) {

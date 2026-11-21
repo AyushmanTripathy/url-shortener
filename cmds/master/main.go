@@ -25,9 +25,10 @@ func main() {
 	defer natsConn.CloseReceiver()
 
 	routes := mux.NewRouter()
+	limiter := newRateLimiterFromEnv()
 
-	routes.HandleFunc("/", createNewRedirect).Methods("POST")
-	routes.HandleFunc("/", updateExistingRedirect).Methods("PATCH")
+	routes.Handle("/", limiter.middleware(http.HandlerFunc(createNewRedirect))).Methods("POST")
+	routes.Handle("/", limiter.middleware(http.HandlerFunc(updateExistingRedirect))).Methods("PATCH")
 	routes.HandleFunc("/{alias}", getRedirect).Methods("GET")
 
 	port, found := os.LookupEnv("PORT")
